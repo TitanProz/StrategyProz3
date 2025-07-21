@@ -35,11 +35,12 @@ export function ModulesList({ collapsed = false, onToggle }: ModulesListProps) {
   const { modules, fetchModules, moduleProgress, completedModules } =
     useModuleStore();
 
-  /* Load modules once */
+  /* One‑time   */
   useEffect(() => {
     fetchModules();
   }, [fetchModules]);
 
+  /* Helpers */
   const isModuleUnlocked = (m: any) =>
     m.slug === 'capabilities-inventory' ||
     m.order === 0 ||
@@ -49,9 +50,12 @@ export function ModulesList({ collapsed = false, onToggle }: ModulesListProps) {
   const isCurrentModule = (slug: string) =>
     location.pathname === `/modules/${slug}`;
 
+  /* ------------------------------------------------------------------ */
+  /*                               JSX                                  */
+  /* ------------------------------------------------------------------ */
   return (
     <div className="h-full bg-[#1E3A8A]">
-      {/* Top bar — logo + toggle button */}
+      {/* Logo + collapse‑toggle */}
       <div className="h-20 flex items-center bg-[#1E3A8A] px-4">
         {!collapsed && (
           <img
@@ -65,7 +69,6 @@ export function ModulesList({ collapsed = false, onToggle }: ModulesListProps) {
           <button
             onClick={onToggle}
             aria-label="Toggle sidebar"
-            /* • When expanded ⇒ show only on mobile    • When collapsed ⇒ always show */
             className={`text-white p-2 rounded hover:bg-white hover:bg-opacity-20 transition-colors
               ${collapsed ? 'ml-0' : 'ml-auto md:hidden'}
             `}
@@ -81,11 +84,11 @@ export function ModulesList({ collapsed = false, onToggle }: ModulesListProps) {
 
       {/* Scrollable list */}
       <nav className="p-4 md:p-6 overflow-y-auto h-[calc(100vh-5rem)]">
-        {/* Introduction button */}
+        {/* Introduction */}
         <button
-          onClick={() => navigate('/modules')}
+          onClick={() => navigate('/modules/introduction')}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-colors mb-4 module-hover ${
-            location.pathname === '/modules'
+            location.pathname === '/modules/introduction'
               ? 'bg-white bg-opacity-20 text-white shadow-sm'
               : 'text-white'
           }`}
