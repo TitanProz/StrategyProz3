@@ -43,10 +43,18 @@ function formatAnalysisForPdf(analysis: any, moduleSlug: string): string[] {
     case 'strategy-framework':
       lines.push('Strategy Framework', '');
       if (analysis.valuePropositions?.length) {
-        lines.push('Value Propositions:', ...bullet(analysis.valuePropositions, '  '), '');
+        lines.push(
+          'Value Propositions:',
+          ...bullet(analysis.valuePropositions, '  '),
+          ''
+        );
       }
       if (analysis.targetIndustries?.length) {
-        lines.push('Target Industries:', ...bullet(analysis.targetIndustries, '  '), '');
+        lines.push(
+          'Target Industries:',
+          ...bullet(analysis.targetIndustries, '  '),
+          ''
+        );
       }
       if (analysis.idealClients?.length) {
         lines.push('Ideal Clients:', ...bullet(analysis.idealClients, '  '));
@@ -82,26 +90,38 @@ function formatAnalysisForPdf(analysis: any, moduleSlug: string): string[] {
       (analysis.topNiches || []).forEach((n: any) => {
         lines.push(`${n.niche}`, `  ${n.positioning}`, '');
       });
-      lines.push('Risks & Obstacles:', ...bullet(analysis.risksObstacles || [], '  '), '');
+      lines.push(
+        'Risks & Obstacles:',
+        ...bullet(analysis.risksObstacles || [], '  '),
+        ''
+      );
       lines.push('Strategies:', ...bullet(analysis.strategies || [], '  '), '');
       break;
 
     case 'pricing':
       lines.push('Pricing Strategy', '');
       Object.entries(analysis).forEach(([k, v]) => {
-        lines.push(`${k[0].toUpperCase() + k.slice(1)}:`, `  ${v as string}`, '');
+        lines.push(
+          `${k[0].toUpperCase() + k.slice(1)}:`,
+          `  ${v as string}`,
+          ''
+        );
       });
       break;
 
     case 'final-report':
     default:
-      lines.push('Consulting Strategy Report', '', JSON.stringify(analysis, null, 2));
+      lines.push(
+        'Consulting Strategy Report',
+        '',
+        JSON.stringify(analysis, null, 2)
+      );
   }
   return lines;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Final-report analysis component                                            */
+/* Final‑report analysis component                                            */
 /* -------------------------------------------------------------------------- */
 function FinalReportAnalysis({
   isLoading,
@@ -140,9 +160,7 @@ function FinalReportAnalysis({
 
   return (
     <div className="min-h-[400px] w-full flex flex-col space-y-8">
-      <h2 className="text-2xl font-bold text-slate-900">
-        Executive Summary
-      </h2>
+      <h2 className="text-2xl font-bold text-slate-900">Executive Summary</h2>
       <div className="bg-white p-6 rounded-xl border-2 border-slate-200 space-y-4">
         <p className="text-lg text-slate-900 whitespace-pre-wrap">
           {analysis.executiveSummary?.overview}
@@ -165,7 +183,7 @@ function FinalReportAnalysis({
         </p>
       </div>
 
-      {/* Additional sections could be rendered similarly… */}
+      {/* Additional sections can be rendered similarly */}
 
       <div className="flex justify-start mt-8">
         <button
@@ -184,27 +202,25 @@ function FinalReportAnalysis({
 /* Main ModuleContent component                                               */
 /* -------------------------------------------------------------------------- */
 export default function ModuleContent() {
-  const navigate          = useNavigate();
-  const { moduleId = '' } = useParams();                       // may be blank
-  const effectiveSlug     = moduleId || 'introduction';        // treat blank as intro
+  const navigate = useNavigate();
+  const { moduleId = '' } = useParams();
+  const effectiveSlug = moduleId || 'introduction';
 
-  /* ───────────── local UI state ───────────── */
+  /* ─────────────────────── local state ─────────────────────── */
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answer, setAnswer]               = useState('');
+  const [answer, setAnswer] = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [direction, setDirection]         = useState<'next' | 'prev'>('next');
-  const [isAnalyzing, setIsAnalyzing]     = useState(false);
-  const [analysis, setAnalysis]           = useState<any>(null);
+  const [direction, setDirection] = useState<'next' | 'prev'>('next');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<any>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [showLoading, setShowLoading]     = useState(false);
+  const [showLoading, setShowLoading] = useState(false);
   const [isModuleLoading, setIsModuleLoading] = useState(true);
-  const [noQuestionsFound, setNoQuestionsFound] = useState(false);
 
-  /* ───────────── refs ───────────── */
-  const prevAnswer   = useRef('');
-  const hasTyped     = useRef(false);
+  /* ─────────────────────── refs ─────────────────────── */
+  const hasTyped = useRef(false);
 
-  /* ───────────── stores ───────────── */
+  /* ─────────────────────── stores ─────────────────────── */
   const { user } = useAuthStore();
   const {
     currentModule,
@@ -224,35 +240,27 @@ export default function ModuleContent() {
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  /* ----------------------- Load module ----------------------- */
+  /* -------------------- module loader -------------------- */
   useEffect(() => {
     const load = async () => {
       setIsModuleLoading(true);
-
       const mod = await fetchModuleBySlug(effectiveSlug);
-      if (!mod) {
-        setNoQuestionsFound(true);
-        setIsModuleLoading(false);
-        return;
-      }
-      await fetchResponses(mod.id);
+      if (mod) await fetchResponses(mod.id);
       setIsModuleLoading(false);
     };
-
     load();
   }, [effectiveSlug, fetchModuleBySlug, fetchResponses]);
 
-  /* ---------------- sync answer when question changes -------- */
+  /* -------------------- sync answer -------------------- */
   useEffect(() => {
     if (questions.length) {
       const saved = responses[questions[currentQuestionIndex]?.id] || '';
       setAnswer(saved);
-      prevAnswer.current = saved;
       hasTyped.current = false;
     }
   }, [currentQuestionIndex, questions, responses]);
 
-  /* ---------------- auto-save ---------------- */
+  /* -------------------- debounce auto‑save -------------------- */
   useEffect(() => {
     if (!currentQuestion || !hasTyped.current) return;
     const t = setTimeout(
@@ -264,7 +272,7 @@ export default function ModuleContent() {
     return () => clearTimeout(t);
   }, [answer, currentQuestion, saveResponse]);
 
-  /* ---------------- navigation handlers ---------------- */
+  /* -------------------- handlers -------------------- */
   const handleAnswerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setAnswer(e.target.value);
     hasTyped.current = true;
@@ -272,8 +280,6 @@ export default function ModuleContent() {
 
   const handlePrevious = () => {
     if (isTransitioning) return;
-
-    /* first Q → previous module (or intro) */
     if (currentQuestionIndex === 0) {
       const idx = modules.findIndex((m) => m.id === currentModule?.id);
       navigate(
@@ -281,7 +287,6 @@ export default function ModuleContent() {
       );
       return;
     }
-
     setDirection('prev');
     setIsTransitioning(true);
     setTimeout(() => {
@@ -291,19 +296,27 @@ export default function ModuleContent() {
   };
 
   const handleNext = async () => {
-    if (isTransitioning) return;
-    if (!currentQuestion) return;
+    if (isTransitioning || !currentQuestion) return;
 
+    /* Save the answer (with error handling) */
     if (answer.trim()) {
-      await saveResponse(currentQuestion.id, answer);
+      try {
+        await saveResponse(currentQuestion.id, answer);
+      } catch (err: any) {
+        console.error(err);
+        toast.error(
+          `Failed to save your answer – it will stay only in this session.\n${err?.message || err}`
+        );
+      }
     }
 
-    /* last question → run analysis */
+    /* Last question → analyze */
     if (currentQuestionIndex === questions.length - 1) {
       setShowLoading(true);
       return handleAnalysis();
     }
 
+    /* Otherwise go to next */
     setDirection('next');
     setIsTransitioning(true);
     setTimeout(() => {
@@ -312,7 +325,7 @@ export default function ModuleContent() {
     }, 280);
   };
 
-  /* ---------------- run AI analysis ---------------- */
+  /* -------------------- analysis -------------------- */
   const handleAnalysis = async () => {
     if (!currentModule) return;
     setIsAnalyzing(true);
@@ -326,26 +339,26 @@ export default function ModuleContent() {
       );
       setAnalysis(result);
 
-      /* Save to DB for future */
       if (user?.id) {
-        await supabase
+        const { error } = await supabase
           .from('user_settings')
-          .update({ [`analysis_${currentModule.slug}`]: result })
-          .eq('user_id', user.id);
+          .upsert(
+            { user_id: user.id, [`analysis_${currentModule.slug}`]: result },
+            { onConflict: 'user_id' }
+          );
+        if (error) console.error('Save analysis error:', error);
       }
 
-      /* Unlock next module */
       await unlockNextModule(currentModule.id);
     } catch (err: any) {
-      console.error(err);
-      setAnalysisError(err.message);
+      setAnalysisError(err.message || String(err));
     } finally {
       setShowLoading(false);
       setIsAnalyzing(false);
     }
   };
 
-  /* ---------------- PDF helper ---------------- */
+  /* -------------------- download PDF -------------------- */
   const downloadPdf = () => {
     if (!analysis || !currentModule) return;
     const doc = new jsPDF();
@@ -357,7 +370,7 @@ export default function ModuleContent() {
     doc.save(`${currentModule.slug}-analysis.pdf`);
   };
 
-  /* ---------------- render question card ---------------- */
+  /* -------------------- render question card -------------------- */
   const renderQuestionCard = () => (
     <div className="bg-white rounded-xl shadow-lg p-6 md:min-h-[496px] w-full md:min-w-[920px] flex flex-col">
       <div className="text-xs text-slate-500 mb-2">
@@ -394,17 +407,17 @@ export default function ModuleContent() {
     </div>
   );
 
-  /* ---------------- TOP-LEVEL RETURN ---------------- */
+  /* -------------------- main render -------------------- */
   return (
     <div className="w-full max-w-[1200px] mx-auto px-4 md:px-8 py-12 bg-[#E0F2FF] relative">
-      {/* ① Loading spinner */}
+      {/* Loading */}
       {isModuleLoading && (
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-12 w-12 text-[#1E3A8A] animate-[smooth-spin_1s_linear_infinite]" />
         </div>
       )}
 
-      {/* ② Introduction (video) */}
+      {/* Introduction */}
       {!isModuleLoading && effectiveSlug === 'introduction' && (
         <div className="bg-white rounded-xl shadow-lg p-6 w-full flex flex-col items-center space-y-6">
           <h2 className="text-2xl font-bold text-slate-900">
@@ -424,14 +437,14 @@ export default function ModuleContent() {
         </div>
       )}
 
-      {/* ③ Questionnaire */}
+      {/* Questionnaire */}
       {!analysis &&
         !isModuleLoading &&
         effectiveSlug !== 'introduction' &&
         currentQuestion &&
         renderQuestionCard()}
 
-      {/* ④ Analysis spinners / errors */}
+      {/* Loading / error */}
       {showLoading && (
         <div className="flex flex-col items-center justify-center space-y-4 min-h-[400px] w-full">
           <Loader2 className="h-12 w-12 text-[#1E3A8A] animate-[smooth-spin_1s_linear_infinite]" />
@@ -454,7 +467,7 @@ export default function ModuleContent() {
         </div>
       )}
 
-      {/* ⑤ Analysis views */}
+      {/* Analysis views */}
       {analysis && currentModule?.slug === 'capabilities-inventory' && (
         <AIAnalysis
           analysis={analysis}
@@ -513,7 +526,7 @@ export default function ModuleContent() {
         />
       )}
 
-      {/* ⑥ Practice / Niche badge */}
+      {/* Practice / Niche badge */}
       {(() => {
         const sf = modules.find((m) => m.slug === 'strategy-framework');
         const unlocked = sf ? !!moduleProgress[sf.id] : false;
