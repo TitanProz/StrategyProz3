@@ -6,8 +6,8 @@ import {
   ArrowLeft,
   ArrowRight,
   Loader2,
-  ChevronDown,
   RefreshCw,
+  ChevronDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { analyzeResponses } from '../lib/openai';
@@ -22,7 +22,7 @@ import { saveAs } from 'file-saver';
 import { jsPDF } from 'jspdf';
 
 /* -------------------------------------------------------------------------- */
-/* PDF helper (unchanged)                                                     */
+/* PDF helper                                                                  */
 /* -------------------------------------------------------------------------- */
 function formatAnalysisForPdf(analysis: any, moduleSlug: string): string[] {
   const lines: string[] = [];
@@ -39,15 +39,69 @@ function formatAnalysisForPdf(analysis: any, moduleSlug: string): string[] {
         lines.push('', 'Niches:', ...bullet(analysis.niches, '  '));
       }
       break;
-    /* … other cases unchanged … */
+
+    case 'strategy-framework':
+      lines.push('Strategy Framework', '');
+      if (analysis.valuePropositions?.length) {
+        lines.push('Value Propositions:', ...bullet(analysis.valuePropositions, '  '), '');
+      }
+      if (analysis.targetIndustries?.length) {
+        lines.push('Target Industries:', ...bullet(analysis.targetIndustries, '  '), '');
+      }
+      if (analysis.idealClients?.length) {
+        lines.push('Ideal Clients:', ...bullet(analysis.idealClients, '  '));
+      }
+      break;
+
+    case 'opportunity-map':
+      lines.push('Opportunity Map', '');
+      (analysis.opportunityMapServices || []).forEach((srv: any) => {
+        lines.push(`Service: ${srv.serviceName}`);
+        lines.push(...bullet(srv.topIndustries, '  '));
+        lines.push('');
+      });
+      (analysis.opportunityMapIndustries || []).forEach((ind: any) => {
+        lines.push(`Industry: ${ind.industryName}`);
+        lines.push(...bullet(ind.services, '  '));
+        lines.push('');
+      });
+      break;
+
+    case 'service-offering':
+      lines.push('Service Offering', '');
+      (analysis.serviceTiers || []).forEach((tier: any) => {
+        lines.push(`${tier.name} Tier`);
+        lines.push(`  Features: ${tier.features}`);
+        lines.push(`  Outcomes: ${tier.outcomes}`);
+        lines.push(`  Intangible Benefits: ${tier.intangibleBenefits}`, '');
+      });
+      break;
+
+    case 'positioning':
+      lines.push('Positioning', '');
+      (analysis.topNiches || []).forEach((n: any) => {
+        lines.push(`${n.niche}`, `  ${n.positioning}`, '');
+      });
+      lines.push('Risks & Obstacles:', ...bullet(analysis.risksObstacles || [], '  '), '');
+      lines.push('Strategies:', ...bullet(analysis.strategies || [], '  '), '');
+      break;
+
+    case 'pricing':
+      lines.push('Pricing Strategy', '');
+      Object.entries(analysis).forEach(([k, v]) => {
+        lines.push(`${k[0].toUpperCase() + k.slice(1)}:`, `  ${v as string}`, '');
+      });
+      break;
+
+    case 'final-report':
     default:
-      lines.push('Consulting Strategy', '', JSON.stringify(analysis, null, 2));
+      lines.push('Consulting Strategy Report', '', JSON.stringify(analysis, null, 2));
   }
   return lines;
 }
 
 /* -------------------------------------------------------------------------- */
-/* Final‑report analysis component (unchanged)                                */
+/* Final-report analysis component                                            */
 /* -------------------------------------------------------------------------- */
 function FinalReportAnalysis({
   isLoading,
@@ -84,10 +138,44 @@ function FinalReportAnalysis({
       </div>
     );
 
-  /* …rest of FinalReportAnalysis unchanged… */
   return (
-    <div className="min-h-[400px] w-full flex flex-col">
-      {/* existing JSX */}
+    <div className="min-h-[400px] w-full flex flex-col space-y-8">
+      <h2 className="text-2xl font-bold text-slate-900">
+        Executive Summary
+      </h2>
+      <div className="bg-white p-6 rounded-xl border-2 border-slate-200 space-y-4">
+        <p className="text-lg text-slate-900 whitespace-pre-wrap">
+          {analysis.executiveSummary?.overview}
+        </p>
+        <div>
+          <p className="font-medium text-slate-900">Key Strategies</p>
+          <ul className="list-disc pl-5 space-y-1">
+            {(analysis.executiveSummary?.keyStrategies || []).map(
+              (s: string, idx: number) => (
+                <li key={idx} className="text-slate-700">
+                  {s}
+                </li>
+              )
+            )}
+          </ul>
+        </div>
+        <p className="text-lg text-slate-900">
+          <span className="font-medium">Vision: </span>
+          {analysis.executiveSummary?.vision}
+        </p>
+      </div>
+
+      {/* Additional sections could be rendered similarly… */}
+
+      <div className="flex justify-start mt-8">
+        <button
+          onClick={onReturn}
+          className="btn-secondary flex items-center justify-center min-w-[160px]"
+        >
+          <ArrowLeft className="h-5 w-5 mr-2" />
+          Return
+        </button>
+      </div>
     </div>
   );
 }
@@ -96,35 +184,27 @@ function FinalReportAnalysis({
 /* Main ModuleContent component                                               */
 /* -------------------------------------------------------------------------- */
 export default function ModuleContent() {
-  const navigate = useNavigate();
-  const { moduleId } = useParams();
+  const navigate          = useNavigate();
+  const { moduleId = '' } = useParams();                       // may be blank
+  const effectiveSlug     = moduleId || 'introduction';        // treat blank as intro
 
-  /* ────── NEW: ensure we always treat empty slug as "introduction" ────── */
-  const effectiveSlug = moduleId || 'introduction';
-
-  /* ──────────────── local state ──────────────── */
+  /* ───────────── local UI state ───────────── */
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answer, setAnswer] = useState('');
-  const [progress, setProgress] = useState(0);
-  const [displayProgress, setDisplayProgress] = useState(0);
+  const [answer, setAnswer]               = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [direction, setDirection] = useState<'next' | 'prev'>('next');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<any>(null);
+  const [direction, setDirection]         = useState<'next' | 'prev'>('next');
+  const [isAnalyzing, setIsAnalyzing]     = useState(false);
+  const [analysis, setAnalysis]           = useState<any>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [showLoading, setShowLoading] = useState(false);
-  const [showGenerateButton, setShowGenerateButton] = useState(false);
-  const [showDownloadOptions, setShowDownloadOptions] = useState(false);
+  const [showLoading, setShowLoading]     = useState(false);
   const [isModuleLoading, setIsModuleLoading] = useState(true);
   const [noQuestionsFound, setNoQuestionsFound] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
 
-  /* ──────────────── refs ──────────────── */
-  const prevAnswer = useRef('');
-  const hasTyped = useRef(false);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  /* ───────────── refs ───────────── */
+  const prevAnswer   = useRef('');
+  const hasTyped     = useRef(false);
 
-  /* ──────────────── stores ──────────────── */
+  /* ───────────── stores ───────────── */
   const { user } = useAuthStore();
   const {
     currentModule,
@@ -133,7 +213,6 @@ export default function ModuleContent() {
     fetchModuleBySlug,
     fetchResponses,
     saveResponse,
-    updateProgress,
     modules,
     moduleProgress,
     unlockNextModule,
@@ -141,14 +220,11 @@ export default function ModuleContent() {
     selectedNiche,
     setSelectedPractice,
     setSelectedNiche,
-    fetchQuestions,
-    allQuestions,
-    fetchAllQuestions,
   } = useModuleStore();
 
   const currentQuestion = questions[currentQuestionIndex];
 
-  /* ---------------- effect: load module ---------------- */
+  /* ----------------------- Load module ----------------------- */
   useEffect(() => {
     const load = async () => {
       setIsModuleLoading(true);
@@ -159,16 +235,14 @@ export default function ModuleContent() {
         setIsModuleLoading(false);
         return;
       }
-
       await fetchResponses(mod.id);
       setIsModuleLoading(false);
     };
 
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveSlug]);
+  }, [effectiveSlug, fetchModuleBySlug, fetchResponses]);
 
-  /* ---------------- effect: keep answer sync ---------------- */
+  /* ---------------- sync answer when question changes -------- */
   useEffect(() => {
     if (questions.length) {
       const saved = responses[questions[currentQuestionIndex]?.id] || '';
@@ -178,7 +252,7 @@ export default function ModuleContent() {
     }
   }, [currentQuestionIndex, questions, responses]);
 
-  /* ---------------- auto-save debounce -------------------- */
+  /* ---------------- auto-save ---------------- */
   useEffect(() => {
     if (!currentQuestion || !hasTyped.current) return;
     const t = setTimeout(
@@ -190,7 +264,7 @@ export default function ModuleContent() {
     return () => clearTimeout(t);
   }, [answer, currentQuestion, saveResponse]);
 
-  /* ---------------- handlers ------------------------------ */
+  /* ---------------- navigation handlers ---------------- */
   const handleAnswerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setAnswer(e.target.value);
     hasTyped.current = true;
@@ -198,6 +272,8 @@ export default function ModuleContent() {
 
   const handlePrevious = () => {
     if (isTransitioning) return;
+
+    /* first Q → previous module (or intro) */
     if (currentQuestionIndex === 0) {
       const idx = modules.findIndex((m) => m.id === currentModule?.id);
       navigate(
@@ -205,6 +281,7 @@ export default function ModuleContent() {
       );
       return;
     }
+
     setDirection('prev');
     setIsTransitioning(true);
     setTimeout(() => {
@@ -214,20 +291,19 @@ export default function ModuleContent() {
   };
 
   const handleNext = async () => {
-    if (isTransitioning || !currentQuestion) return;
+    if (isTransitioning) return;
+    if (!currentQuestion) return;
 
-    /* Save answer if provided */
     if (answer.trim()) {
       await saveResponse(currentQuestion.id, answer);
     }
 
-    /* If last question → run analysis */
+    /* last question → run analysis */
     if (currentQuestionIndex === questions.length - 1) {
       setShowLoading(true);
       return handleAnalysis();
     }
 
-    /* Otherwise go to next question */
     setDirection('next');
     setIsTransitioning(true);
     setTimeout(() => {
@@ -236,7 +312,52 @@ export default function ModuleContent() {
     }, 280);
   };
 
-  /* ---------------- question card renderer ---------------- */
+  /* ---------------- run AI analysis ---------------- */
+  const handleAnalysis = async () => {
+    if (!currentModule) return;
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+
+    try {
+      const result = await analyzeResponses(
+        responses,
+        selectedPractice ?? undefined,
+        currentModule.slug
+      );
+      setAnalysis(result);
+
+      /* Save to DB for future */
+      if (user?.id) {
+        await supabase
+          .from('user_settings')
+          .update({ [`analysis_${currentModule.slug}`]: result })
+          .eq('user_id', user.id);
+      }
+
+      /* Unlock next module */
+      await unlockNextModule(currentModule.id);
+    } catch (err: any) {
+      console.error(err);
+      setAnalysisError(err.message);
+    } finally {
+      setShowLoading(false);
+      setIsAnalyzing(false);
+    }
+  };
+
+  /* ---------------- PDF helper ---------------- */
+  const downloadPdf = () => {
+    if (!analysis || !currentModule) return;
+    const doc = new jsPDF();
+    const lines = formatAnalysisForPdf(analysis, currentModule.slug);
+    doc.setFontSize(10);
+    lines.forEach((l, idx) => {
+      doc.text(l, 10, 15 + idx * 6);
+    });
+    doc.save(`${currentModule.slug}-analysis.pdf`);
+  };
+
+  /* ---------------- render question card ---------------- */
   const renderQuestionCard = () => (
     <div className="bg-white rounded-xl shadow-lg p-6 md:min-h-[496px] w-full md:min-w-[920px] flex flex-col">
       <div className="text-xs text-slate-500 mb-2">
@@ -262,8 +383,7 @@ export default function ModuleContent() {
         <button
           onClick={handleNext}
           disabled={
-            !answer.trim() &&
-            currentQuestionIndex !== questions.length - 1
+            !answer.trim() && currentQuestionIndex !== questions.length - 1
           }
           className="btn-primary flex items-center justify-center min-w-[140px]"
         >
@@ -274,14 +394,155 @@ export default function ModuleContent() {
     </div>
   );
 
-  /* ---------------- top-level return --------------------- */
+  /* ---------------- TOP-LEVEL RETURN ---------------- */
   return (
     <div className="w-full max-w-[1200px] mx-auto px-4 md:px-8 py-12 bg-[#E0F2FF] relative">
-      {/* … existing intro / analysis / download UI (unchanged) … */}
+      {/* ① Loading spinner */}
+      {isModuleLoading && (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-12 w-12 text-[#1E3A8A] animate-[smooth-spin_1s_linear_infinite]" />
+        </div>
+      )}
 
-      {!analysis && !isModuleLoading && currentQuestion && renderQuestionCard()}
+      {/* ② Introduction (video) */}
+      {!isModuleLoading && effectiveSlug === 'introduction' && (
+        <div className="bg-white rounded-xl shadow-lg p-6 w-full flex flex-col items-center space-y-6">
+          <h2 className="text-2xl font-bold text-slate-900">
+            Welcome to StrategyProz!
+          </h2>
+          <video
+            className="w-full max-w-2xl rounded-lg border"
+            controls
+            poster="https://storage.googleapis.com/msgsndr/jY21tpLjXFAMvoP23PQ2/media/intro-thumb.png"
+          >
+            <source
+              src="https://storage.googleapis.com/msgsndr/jY21tpLjXFAMvoP23PQ2/media/intro.mp4"
+              type="video/mp4"
+            />
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      )}
 
-      {/* Practice / Niche badge, unchanged */}
+      {/* ③ Questionnaire */}
+      {!analysis &&
+        !isModuleLoading &&
+        effectiveSlug !== 'introduction' &&
+        currentQuestion &&
+        renderQuestionCard()}
+
+      {/* ④ Analysis spinners / errors */}
+      {showLoading && (
+        <div className="flex flex-col items-center justify-center space-y-4 min-h-[400px] w-full">
+          <Loader2 className="h-12 w-12 text-[#1E3A8A] animate-[smooth-spin_1s_linear_infinite]" />
+          <p className="text-lg font-medium text-slate-700">Analyzing</p>
+        </div>
+      )}
+      {analysisError && (
+        <div className="flex flex-col items-center justify-center space-y-4 min-h-[400px] w-full">
+          <div className="bg-red-50 text-red-800 p-4 rounded-xl max-w-md text-center">
+            <p className="font-medium mb-2">Analysis Failed</p>
+            <p className="text-sm">{analysisError}</p>
+            <button
+              onClick={handleAnalysis}
+              className="btn-primary flex items-center gap-2 mt-4"
+            >
+              <RefreshCw className="h-5 w-5" />
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ⑤ Analysis views */}
+      {analysis && currentModule?.slug === 'capabilities-inventory' && (
+        <AIAnalysis
+          analysis={analysis}
+          isLoading={isAnalyzing}
+          error={analysisError || undefined}
+          onRetry={handleAnalysis}
+          onReturn={() => setAnalysis(null)}
+          onSelectPractice={(p) => setSelectedPractice(p)}
+          onSelectNiche={(n) => setSelectedNiche(n)}
+        />
+      )}
+
+      {analysis && currentModule?.slug === 'strategy-framework' && (
+        <StrategyAnalysis
+          analysis={analysis}
+          isLoading={isAnalyzing}
+          error={analysisError || undefined}
+          selectedPractice={selectedPractice}
+          onReturn={() => setAnalysis(null)}
+        />
+      )}
+
+      {analysis && currentModule?.slug === 'opportunity-map' && (
+        <OpportunityMapAnalysis
+          analysis={analysis}
+          isLoading={isAnalyzing}
+          error={analysisError || undefined}
+          onReturn={() => setAnalysis(null)}
+        />
+      )}
+
+      {analysis && currentModule?.slug === 'positioning' && (
+        <PositioningAnalysis
+          analysis={analysis}
+          isLoading={isAnalyzing}
+          error={analysisError || undefined}
+          onReturn={() => setAnalysis(null)}
+        />
+      )}
+
+      {analysis && currentModule?.slug === 'pricing' && (
+        <PricingAnalysis
+          analysis={analysis}
+          isLoading={isAnalyzing}
+          error={analysisError || undefined}
+          onReturn={() => setAnalysis(null)}
+        />
+      )}
+
+      {analysis && currentModule?.slug === 'final-report' && (
+        <FinalReportAnalysis
+          analysis={analysis}
+          isLoading={isAnalyzing}
+          error={analysisError || undefined}
+          onReturn={() => setAnalysis(null)}
+        />
+      )}
+
+      {/* ⑥ Practice / Niche badge */}
+      {(() => {
+        const sf = modules.find((m) => m.slug === 'strategy-framework');
+        const unlocked = sf ? !!moduleProgress[sf.id] : false;
+        if (!unlocked || (!selectedPractice && !selectedNiche)) return null;
+
+        return (
+          <div
+            className="
+              fixed bottom-2 md:bottom-4 left-2 md:left-4
+              bg-white text-black rounded-xl shadow-lg
+              p-1 md:p-4
+              transform scale-50 md:scale-100 origin-bottom-left
+              z-10 md:z-50
+              pointer-events-none
+            "
+          >
+            {selectedPractice && (
+              <p className="text-xs md:text-sm font-medium">
+                Practice:&nbsp;{selectedPractice}
+              </p>
+            )}
+            {selectedNiche && (
+              <p className="text-xs md:text-sm font-medium">
+                Niche:&nbsp;{selectedNiche}
+              </p>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
