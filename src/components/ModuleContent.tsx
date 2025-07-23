@@ -535,21 +535,21 @@ export default function ModuleContent() {
         return (
           <div
             className="
-              fixed bottom-2 md:bottom-4 left-2 md:left-4
+              fixed bottom-4 left-4
               bg-white text-black rounded-xl shadow-lg
-              p-1 md:p-4
-              transform scale-50 md:scale-100 origin-bottom-left
-              z-10 md:z-50
+              p-3
+              z-50
               pointer-events-none
+              border border-slate-300
             "
           >
             {selectedPractice && (
-              <p className="text-xs md:text-sm font-medium">
+              <p className="text-sm font-medium">
                 Practice:&nbsp;{selectedPractice}
               </p>
             )}
             {selectedNiche && (
-              <p className="text-xs md:text-sm font-medium">
+              <p className="text-sm font-medium">
                 Niche:&nbsp;{selectedNiche}
               </p>
             )}
